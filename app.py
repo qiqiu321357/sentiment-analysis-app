@@ -1,50 +1,59 @@
-import streamlit as st
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import seaborn as sns
 from wordcloud import WordCloud
 import jieba
 import re
 import numpy as np
-import os
 from datetime import datetime
 import json
+from pathlib import Path
+
+import streamlit as st
 
 # ==========================================
-# 1. 全局配置
+# 1. 全局配置（修复中文显示）
 # ==========================================
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS']
-plt.rcParams['axes.unicode_minus'] = False
 
-# 查找中文字体
-import os
-import platform
+# 获取当前目录（兼容本地和Streamlit Cloud）
+try:
+    current_dir = Path(__file__).parent.absolute()
+except:
+    current_dir = Path(os.getcwd())
 
-# 云端字体适配（自动识别环境）
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-font_candidates = [
-    os.path.join(BASE_DIR, 'simhei.ttf'),  # 优先使用上传的字体
-    'C:/Windows/Fonts/simhei.ttf',
-    '/System/Library/Fonts/PingFang.ttc',
-    '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',  # Linux常见中文字体
-]
+# 字体文件路径（确保simhei.ttf和app.py在同一文件夹）
+font_path = current_dir / 'simhei.ttf'
 
+# 字体配置（兼容新旧版matplotlib）
 FONT_PATH = None
-for f in font_candidates:
-    if os.path.exists(f):
-        FONT_PATH = f
-        break
-
-# 设置matplotlib字体
-if FONT_PATH:
-    plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+if font_path.exists():
+    try:
+        # 新版matplotlib (3.6+) 使用 addfont
+        fm.fontManager.addfont(str(font_path))
+        plt.rcParams['font.family'] = ['SimHei', 'DejaVu Sans']
+        FONT_PATH = str(font_path)
+        print(f"[INFO] 已加载中文字体: {font_path}")
+    except AttributeError:
+        # 旧版降级处理
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans', 'Arial Unicode MS']
+        FONT_PATH = str(font_path)
+        print(f"[INFO] 旧版matplotlib，使用备用字体设置")
+    except Exception as e:
+        print(f"[WARNING] 字体加载失败: {e}")
+        plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial Unicode MS']
 else:
-    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial Unicode MS']
+    # 云端无字体文件时的兜底方案
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
+    print(f"[WARNING] 字体文件不存在: {font_path}，中文可能显示为方框")
+
 plt.rcParams['axes.unicode_minus'] = False
 
+# Streamlit 页面配置（必须在任何st命令之前）
 st.set_page_config(
     page_title="电商评论情感分析系统 - 天津财经大学",
-    page_icon="📊",
+    page_icon="",
     layout="wide"
 )
 
@@ -291,17 +300,17 @@ def get_sentiment_label(score):
 # ==========================================
 # 4. Streamlit 界面（优化版）
 # ==========================================
-st.title("📊  基于深度学习的电商评论情感分析系统 ")
+st.title("电商评论情感分析系统")
 st.markdown("**天津财经大学 | 信息与计算科学专业 | VeriGuard**")
 st.markdown("**整合版**：全网电商情感词典 + 细粒度情感计算 + 多维度分析")
 
 st.sidebar.title("功能导航")
 page = st.sidebar.radio("选择页面", [
-    "🏠 项目简介", 
-    "📤 数据上传分析", 
-    "📈 可视化中心",
-    "🤖 单条预测",
-    "📋 词典管理"
+    "项目简介", 
+    "数据上传分析", 
+    "可视化中心",
+    "单条预测",
+    "词典管理"
 ])
 
 # 会话状态管理
@@ -324,7 +333,7 @@ LABEL_COLORS = {
 sentiment_dict = load_integrated_sentiment_dict()
 
 # ---------------------- 页面1：项目简介 ----------------------
-if page == "🏠 项目简介":
+if page == "项目简介":
     st.header("项目概述")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("核心词典", "HowNet+NTUSD+BOSON")
@@ -333,21 +342,20 @@ if page == "🏠 项目简介":
     col4.metric("适用场景", "全品类电商评论")
     
     st.markdown("""
-    ### 🎯 技术创新点
+    ### 技术创新点
     1. **全网词典整合**：融合HowNet、NTUSD、BOSON等权威词典，补充电商领域词/网络新词
     2. **细粒度情感计算**：基于情感强度+否定词反转+程度副词权重，得分更精准
     3. **多维度分析**：质量/物流/包装/价格/服务/体验/外观7大维度情感拆解
     4. **明确模式识别**："五星好评"直接9.5分，"踩雷"直接2分，提升极端评论识别精度
     
-    ### 📚 词典资源
+    ### 词典资源
     - 基础情感词：28000+ 词条（带强度评分）
     - 电商领域词：5000+ 词条（覆盖全品类）
     - 配套词典：否定词/程度副词/网络新词/明确模式
     """)
 
 # ---------------------- 页面2：数据上传分析 ----------------------
-# ---------------------- 页面2：数据上传分析 ----------------------
-elif page == "📤 数据上传分析":
+elif page == "数据上传分析":
     st.header("上传电商评论数据")
     uploaded = st.file_uploader("上传Excel/CSV文件", type=['xlsx', 'csv'])
     
@@ -371,7 +379,7 @@ elif page == "📤 数据上传分析":
             df = df[[col for col in df.columns if col.strip() != '']]
             
             st.session_state.df = df
-            st.success(f"✅ 成功加载 {len(df)} 条评论数据")
+            st.success(f"成功加载 {len(df)} 条评论数据")
             
             # 精准识别评论内容列
             content_col = None
@@ -409,14 +417,14 @@ elif page == "📤 数据上传分析":
             if candidate_cols:
                 content_col = st.selectbox("请选择评论内容列", candidate_cols)
             elif not content_col:
-                st.warning("⚠️ 未识别到典型评论内容列，请手动选择（避免选择评论人/时间等）")
+                st.warning("未识别到典型评论内容列，请手动选择（避免选择评论人/时间等）")
                 content_col = st.selectbox("请选择评论内容列", df.columns)
             
             # 保存选中列
             st.session_state.content_col = content_col
             
             # 彻底修正：列内容预览（从Series→DataFrame）
-            st.subheader("📝 所选列内容预览（前5条）")
+            st.subheader("所选列内容预览（前5条）")
             # 用双层方括号 df[[content_col]] 将Series转为DataFrame
             preview_df = df[[content_col]].head(5).reset_index(drop=True)
             # 重命名列名
@@ -428,19 +436,19 @@ elif page == "📤 数据上传分析":
             # 数据验证
             validation_passed = True
             if df[content_col].dtype != 'object':
-                st.error("❌ 所选列不是文本类型，请重新选择！")
+                st.error("所选列不是文本类型，请重新选择！")
                 validation_passed = False
             else:
                 # 检查空值
                 non_empty_count = df[content_col].dropna().shape[0]
                 if non_empty_count == 0:
-                    st.error("❌ 所选列无有效内容，请重新选择！")
+                    st.error("所选列无有效内容，请重新选择！")
                     validation_passed = False
                 elif non_empty_count / len(df) < 0.5:
-                    st.warning("⚠️ 所选列空值较多（空值占比 {:.1f}%），可能影响分析结果".format((1 - non_empty_count/len(df))*100))
+                    st.warning("所选列空值较多（空值占比 {:.1f}%），可能影响分析结果".format((1 - non_empty_count/len(df))*100))
             
             # 开始分析
-            if validation_passed and st.button("🚀 开始情感分析", type="primary"):
+            if validation_passed and st.button("开始情感分析", type="primary"):
                 with st.spinner("正在进行细粒度情感分析..."):
                     scores = []
                     labels = []
@@ -467,10 +475,10 @@ elif page == "📤 数据上传分析":
                     st.session_state.dim_analysis = dim_analysis_list
                     progress_bar.empty()
                 
-                st.success("✅ 情感分析完成！")
+                st.success("情感分析完成！")
                 
                 # 核心统计结果
-                st.subheader("📊 核心分析结果")
+                st.subheader("核心分析结果")
                 col1, col2, col3, col4, col5 = st.columns(5)
                 avg_score = np.mean(scores)
                 col1.metric("平均情感得分", f"{avg_score:.2f}/10")
@@ -480,7 +488,7 @@ elif page == "📤 数据上传分析":
                 col5.metric("消极占比", f"{sum(1 for l in labels if l == '消极')/len(labels)*100:.1f}%")
                 
                 # 维度平均得分
-                st.subheader("📈 各维度平均情感得分")
+                st.subheader("各维度平均情感得分")
                 dim_avg_scores = {}
                 for dim in sentiment_dict['dimensions'].keys():
                     dim_avg_scores[dim] = round(df[f'{dim}维度得分'].mean(), 2)
@@ -494,7 +502,7 @@ elif page == "📤 数据上传分析":
                         st.progress(score/10)
                 
                 # 结果预览
-                with st.expander("📋 查看前20条分析结果（含维度得分）", expanded=True):
+                with st.expander("查看前20条分析结果（含维度得分）", expanded=True):
                     display_cols = [content_col, '情感得分', '情感标签'] + [f'{dim}维度得分' for dim in sentiment_dict['dimensions'].keys()]
                     st.dataframe(df[display_cols].head(20), use_container_width=True)
                 
@@ -505,19 +513,19 @@ elif page == "📤 数据上传分析":
                 
                 csv_data = convert_df_to_csv(df)
                 st.download_button(
-                    label="📥 下载分析结果（CSV）",
+                    label="下载分析结果（CSV）",
                     data=csv_data,
                     file_name=f"电商评论情感分析结果_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                     mime="text/csv"
                 )
         
         except Exception as e:
-            st.error(f"❌ 处理失败：{str(e)}")
-            st.info("💡 常见问题：1. 文件编码问题 2. 列名特殊字符 3. 文件损坏")
+            st.error(f"处理失败：{str(e)}")
+            st.info("常见问题：1. 文件编码问题 2. 列名特殊字符 3. 文件损坏")
 # ---------------------- 页面3：可视化中心 ----------------------
-elif page == "📈 可视化中心":
+elif page == "可视化中心":
     if not st.session_state.analyzed:
-        st.warning("⚠️ 请先上传并分析数据")
+        st.warning("请先上传并分析数据")
     else:
         df = st.session_state.df
         content_col = st.session_state.content_col
@@ -654,18 +662,19 @@ elif page == "📈 可视化中心":
             
             # 相关性分析
             corr = df['评论长度'].corr(df['情感得分'])
-            st.info(f"📊 评论长度与情感得分的相关系数：**{corr:.3f}**")
+            st.info(f"评论长度与情感得分的相关系数：**{corr:.3f}**")
             if corr > 0.1:
-                st.success("✅ 评论越长，情感越积极（弱正相关）")
+                st.success("评论越长，情感越积极（弱正相关）")
             elif corr < -0.1:
-                st.warning("⚠️ 评论越长，情感越消极（弱负相关）")
+                st.warning("评论越长，情感越消极（弱负相关）")
             else:
-                st.info("ℹ️ 评论长度与情感得分无明显相关性")
+                st.info("评论长度与情感得分无明显相关性")
         
         # 5. 情感词云图
         elif viz_type == "情感词云图":  
             if not FONT_PATH:
-                st.error("❌ 未找到中文字体")
+                st.error("未找到中文字体，无法生成词云")
+                st.info("解决方案：请确保 simhei.ttf 和 app.py 在同一目录并重新部署")
             else:
                 text = df[content_col].astype(str).str.cat(sep=' ')
                 # 安全清理
@@ -678,11 +687,12 @@ elif page == "📈 可视化中心":
                 words = [w for w in jieba.lcut(text) if len(w) > 1 and w not in stop_words]                
                 if words:
                     wc = WordCloud(
-                        width=1000, height=600,
+                        width=1000, 
+                        height=600, 
                         background_color='white',
                         font_path=FONT_PATH,
                         max_words=150,
-                        collocations=False
+                        collocation=False
                     ).generate(' '.join(words))
                     fig, ax = plt.subplots(figsize=(12, 6))
                     ax.imshow(wc, interpolation='bilinear')
@@ -690,7 +700,7 @@ elif page == "📈 可视化中心":
                     ax.set_title('评论词云图', fontsize=16, fontweight='bold')
                     st.pyplot(fig)
                 else:
-                    st.warning("⚠️ 词频不足，无法生成词云")
+                    st.warning("词频不足，无法生成词云")
         # 6. 维度得分对比
         elif viz_type == "维度得分对比":
             st.subheader("各维度情感得分对比")
@@ -723,16 +733,15 @@ elif page == "📈 可视化中心":
             plt.tight_layout()
             
             st.pyplot(fig)
-        # 7. 月度情感走势（最终修正版）
-        # 7. 月度情感走势（最终无错误版）
+        # 7. 月度情感走势
         elif viz_type == "月度情感走势":
             st.subheader("月度平均情感得分走势")
             
             # 1. 检查必要列
             required_cols = ['商品属性', '情感得分']
             if not all(col in df.columns for col in required_cols):
-                st.warning("⚠️ 数据缺少必要列（需包含'商品属性'和'情感得分'）")
-                st.info("💡 请确保上传的数据包含'商品属性'列（格式示例：@2025年11月2日已购:1包*100抽）")
+                st.warning("数据缺少必要列（需包含'商品属性'和'情感得分'）")
+                st.info("请确保上传的数据包含'商品属性'列（格式示例：@2025年11月2日已购:1包*100抽）")
                 st.stop()
             
             # 2. 日期提取（适配@+日期+额外属性）
@@ -746,7 +755,7 @@ elif page == "📈 可视化中心":
                     try:
                         return pd.to_datetime(match.group(1), format='%Y年%m月%d日')
                     except Exception as e:
-                        st.warning(f"⚠️ 日期解析失败：{match.group(1)}（错误：{str(e)[:50]}）")
+                        st.warning(f"日期解析失败：{match.group(1)}（错误：{str(e)[:50]}）")
                         return None
                 return None
             
@@ -757,30 +766,30 @@ elif page == "📈 可视化中心":
             df_temp = df_temp.dropna(subset=['评论时间'])
             
             # 显示提取结果，帮助排查问题
-            st.info(f"📊 日期提取结果：")
+            st.info(f"日期提取结果：")
             st.info(f"- 总评论数：{len(df)} 条")
             st.info(f"- 成功提取日期：{valid_count} 条（{valid_count/len(df)*100:.1f}%）")
             
             # 无有效数据时终止
             if len(df_temp) == 0:
-                st.error("❌ 无有效日期数据，无法生成月度走势")
+                st.error("无有效日期数据，无法生成月度走势")
                 st.stop()
             
             # 4. 月度分组+补全缺失月份（确保x轴完整）
             df_temp['月份_dt'] = pd.to_datetime(df_temp['评论时间']).dt.to_period('M')
             # 计算月度平均得分（归一化到0-1，与论文一致）
             sent_month = df_temp.groupby('月份_dt')['情感得分'].mean() / 10
-            # 补全缺失月份（如7月无数据，填充为NaN，避免x轴断层）
+            # 补全缺失月份
             if len(sent_month) >= 1:
                 all_months = pd.period_range(start=sent_month.index.min(), end=sent_month.index.max(), freq='M')
                 sent_month = sent_month.reindex(all_months, fill_value=np.nan)
-            # 转为字符串格式，避免Streamlit显示异常
+            # 转为字符串格式
             sent_month.index = sent_month.index.astype(str)
             
             # 5. 数据量验证（至少2个月份才生成折线）
             valid_month_count = sent_month.dropna().shape[0]
             if valid_month_count < 2:
-                st.warning(f"⚠️ 仅{valid_month_count}个月份有有效数据，无法生成折线走势")
+                st.warning(f"仅{valid_month_count}个月份有有效数据，无法生成折线走势")
                 # 显示表格替代折线图
                 st.dataframe(
                     pd.DataFrame({
@@ -791,44 +800,39 @@ elif page == "📈 可视化中心":
                 )
                 st.stop()
             
-            # 6. 绘制折线图（移除connectstyle，兼容所有matplotlib版本）
-            plt.clf()  # 清除缓存，避免残留图表干扰
+            # 6. 绘制折线图
+            plt.clf()
             fig, ax = plt.subplots(figsize=(10, 5))
-            # 核心绘图代码（保留论文同款样式）
             sent_month.plot(
-                marker='o',        # 圆形标记点（与论文图2一致）
-                color='teal',       # 线条颜色（与论文一致）
-                linewidth=2,        # 线条粗细
-                markersize=6,       # 标记点大小
-                ax=ax              # 指定坐标轴
+                marker='o',
+                color='teal',
+                linewidth=2,
+                markersize=6,
+                ax=ax
             )
             
-            # 样式优化（贴合论文）
-            ax.set_title('心相印评论月度平均情感得分走势', fontsize=14, fontweight='bold')
+            ax.set_title('评论月度平均情感得分走势', fontsize=14, fontweight='bold')
             ax.set_ylabel('情感得分（归一化）', fontsize=12)
             ax.set_xlabel('月份', fontsize=12)
-            ax.grid(True, linestyle='--', alpha=0.5)  # 虚线网格（与论文一致）
-            # 自适应y轴范围，确保所有数据可见（解决之前“数据藏在轴外”的问题）
+            ax.grid(True, linestyle='--', alpha=0.5)
             ax.set_ylim(
                 bottom=sent_month.dropna().min() - 0.05,
                 top=sent_month.dropna().max() + 0.05
             )
-            # 旋转x轴标签，避免重叠
             plt.xticks(rotation=45, ha='right')
-            plt.tight_layout()  # 自动调整布局，防止标签被截断
+            plt.tight_layout()
             
-            # 7. 显示图表（Streamlit专用函数，不可遗漏）
             st.pyplot(fig)
-            st.success("✅ 月度情感走势图表生成成功！")
+            st.success("月度情感走势图表生成成功！")
             
-            # 8. 补充论文关键结论
-            st.info(f"🔍 关键结论：")
+            # 8. 关键结论
+            st.info(f"关键结论：")
             st.info(f"- 情感最高月份：{sent_month.idxmax()}（得分：{sent_month.max():.3f}）")
             st.info(f"- 情感最低月份：{sent_month.idxmin()}（得分：{sent_month.min():.3f}）")
             st.info(f"- 整体平均得分：{sent_month.mean():.3f}")
 
 # ---------------------- 页面4：单条预测 ----------------------
-elif page == "🤖 单条预测":
+elif page == "单条预测":
     st.header("实时情感预测（单条评论）")
     
     # 商品类别选择
@@ -842,7 +846,7 @@ elif page == "🤖 单条预测":
         help="支持全品类电商评论，会自动识别情感词和维度词"
     )
     
-    if st.button("🚀 分析情感", type="primary"):
+    if st.button("分析情感", type="primary"):
         if text:
             # 计算情感得分和维度分析
             score, dim_analysis = calculate_sentiment_score(text, sentiment_dict)
@@ -853,35 +857,28 @@ elif page == "🤖 单条预测":
             col1.metric("情感得分", f"{score}/10")
             col2.metric("情感标签", label)
             
-            # 表情映射
-            emoji_map = {
-                "非常积极": "😄", "积极": "🙂", "略微积极": "😊",
-                "中性": "😐", "消极": "😕"
-            }
-            col3.metric("情感表情", emoji_map.get(label, "❓"))
-            
             # 情感强度
             intensity = "极强" if score >= 9 else "强" if score >= 7.5 else "弱" if score >= 6 else "中性" if score >= 4.5 else "弱" if score >= 3 else "强"
-            col4.metric("情感强度", intensity)
+            col3.metric("情感强度", intensity)
             
             # 进度条展示
             st.progress(score/10)
             
             # 情感结论
             if score >= 9.0:
-                st.success(f"👍 非常积极评价！用户满意度极高，属于核心好评。")
+                st.success(f"非常积极评价！用户满意度极高，属于核心好评。")
             elif score >= 7.5:
-                st.success(f"👍 积极评价！用户满意度高，可作为推荐理由。")
+                st.success(f"积极评价！用户满意度高，可作为推荐理由。")
             elif score >= 6.0:
-                st.info(f"😊 略微积极评价！用户基本满意，有小幅提升空间。")
+                st.info(f"略微积极评价！用户基本满意，有小幅提升空间。")
             elif score >= 4.5:
-                st.info(f"😐 中性评价！用户无明显情感倾向，需进一步挖掘需求。")
+                st.info(f"中性评价！用户无明显情感倾向，需进一步挖掘需求。")
             else:
-                st.error(f"👎 消极评价！用户满意度低，建议客服介入处理。")
+                st.error(f"消极评价！用户满意度低，建议客服介入处理。")
             
             # 维度分析结果
             if dim_analysis:
-                st.subheader("📈 维度情感分析")
+                st.subheader("维度情感分析")
                 dim_cols = st.columns(len(dim_analysis))
                 for idx, (dim, dim_score) in enumerate(dim_analysis.items()):
                     with dim_cols[idx]:
@@ -889,7 +886,7 @@ elif page == "🤖 单条预测":
                         st.progress(dim_score/10)
             
             # 详细分析
-            with st.expander("🔍 查看详细分析", expanded=True):
+            with st.expander("查看详细分析", expanded=True):
                 # 分词结果
                 words = jieba.lcut(text)
                 st.write(f"分词结果：{', '.join(words)}")
@@ -915,10 +912,10 @@ elif page == "🤖 单条预测":
                 if degree_words_found:
                     st.write(f"识别到的程度副词：{', '.join(degree_words_found)}（已调整情感强度）")
         else:
-            st.warning("⚠️ 请输入评论内容后再进行分析！")
+            st.warning("请输入评论内容后再进行分析！")
 
 # ---------------------- 页面5：词典管理 ----------------------
-elif page == "📋 词典管理":
+elif page == "词典管理":
     st.header("电商情感词典管理")
     
     # 词典类型选择
@@ -958,7 +955,7 @@ elif page == "📋 词典管理":
         st.dataframe(df_explicit, use_container_width=True)
     
     # 词典导出功能
-    st.subheader("📥 词典导出")
+    st.subheader("词典导出")
     if st.button("导出完整情感词典（JSON）"):
         # 转换为JSON格式
         dict_json = json.dumps(sentiment_dict, ensure_ascii=False, indent=4)
@@ -972,4 +969,4 @@ elif page == "📋 词典管理":
 # 页脚信息
 st.sidebar.markdown("---")
 st.sidebar.info("基于深度学习的电商评论情感分析系统")
-st.sidebar.markdown("📅 更新时间：2026-02-01")
+st.sidebar.markdown("更新时间：2026-02-01")
