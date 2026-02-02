@@ -17,18 +17,30 @@ plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode M
 plt.rcParams['axes.unicode_minus'] = False
 
 # 查找中文字体
+import os
+import platform
+
+# 云端字体适配（自动识别环境）
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 font_candidates = [
+    os.path.join(BASE_DIR, 'simhei.ttf'),  # 优先使用上传的字体
     'C:/Windows/Fonts/simhei.ttf',
-    'C:/Windows/Fonts/simsun.ttc', 
-    'C:/Windows/Fonts/msyh.ttf',
-    '/System/Library/Fonts/PingFang.ttc',  # Mac系统
-    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'  # Linux系统
+    '/System/Library/Fonts/PingFang.ttc',
+    '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',  # Linux常见中文字体
 ]
+
 FONT_PATH = None
 for f in font_candidates:
     if os.path.exists(f):
         FONT_PATH = f
         break
+
+# 设置matplotlib字体
+if FONT_PATH:
+    plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+else:
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(
     page_title="电商评论情感分析系统 - 天津财经大学",
